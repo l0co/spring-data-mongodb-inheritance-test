@@ -39,10 +39,6 @@ I can also use a short identifier, because a full class name can get pretty leng
 
 The idea is great, but for **my use-case** requires some refinements to support more complex model with inheritance.
 
-### `@TextIndexed`
-
-The first thing with the original idea is that `@TextIndexed` doesn't work. This is because Spring Data forcefully creates text indexes for each entity class using class name [here](https://github.com/spring-projects/spring-data-mongodb/blob/2.0.0.RELEASE/spring-data-mongodb/src/main/java/org/springframework/data/mongodb/core/index/MongoPersistentEntityIndexResolver.java#L217). Unfortunately putting name on `@TextIndexed` is [not supported](https://stackoverflow.com/a/39383752) and in a Spring fashion their own classes are finals on privates and you cannot easily change anything. Waiting for `name` support in `@TextIndexed` annotation I currently use an [ugly hack](https://github.com/l0co/spring-data-mongodb-inheritance-test/blob/58877f4f1f7c859798c9f1f2fd7bf1df60d70b85/src/main/java/org/springframework/data/mongodb/core/index/MongoPersistentEntityIndexResolver.java#L204-L211) on `MongoPersistentEntityIndexResolver`.
-
 ## Better inheritance handling
 
 In the original idea the base class can't introduce its own entity, is abstract and without `@TypeAlias` annotation:
@@ -81,6 +77,10 @@ This is achievable using [entities hierarchy scanning](https://github.com/l0co/s
 ## Inherited repositories
 
 The next thing I need is to have the same inheritance for repositories as for entities, because I want to keep some common queries related to base classes on super repositories and have them reusable on derived repositories. This is now possible due to previous feature. For example [`ThingRepository.findByName()`](https://github.com/l0co/spring-data-mongodb-inheritance-test/blob/58877f4f1f7c859798c9f1f2fd7bf1df60d70b85/src/main/java/com/example/demo/repository/ThingRepository.java#L11) can be used and works on all three repos, while still can be used on `ThingRepository` to [get any type of derived entity](https://github.com/l0co/spring-data-mongodb-inheritance-test/blob/58877f4f1f7c859798c9f1f2fd7bf1df60d70b85/src/test/java/com/example/demo/DemoApplicationTests.java#L66-L68).
+
+### `@TextIndexed`
+
+A problem with the original idea is that `@TextIndexed` doesn't work. This is because Spring Data forcefully creates text indexes for each entity class using class name [here](https://github.com/spring-projects/spring-data-mongodb/blob/2.0.0.RELEASE/spring-data-mongodb/src/main/java/org/springframework/data/mongodb/core/index/MongoPersistentEntityIndexResolver.java#L217). Unfortunately putting name on `@TextIndexed` is [not supported](https://stackoverflow.com/a/39383752) and in a Spring fashion their own classes are finals on privates and you cannot easily change anything. Waiting for `name` support in `@TextIndexed` annotation I currently use an [ugly hack](https://github.com/l0co/spring-data-mongodb-inheritance-test/blob/58877f4f1f7c859798c9f1f2fd7bf1df60d70b85/src/main/java/org/springframework/data/mongodb/core/index/MongoPersistentEntityIndexResolver.java#L204-L211) on `MongoPersistentEntityIndexResolver`.
 
 ## `#{entityName}`
 
