@@ -1,14 +1,18 @@
 package com.example.demo.domain;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.TypeAlias;
+import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "things")
-public abstract class Thing {
+@TypeAlias("thing")
+public class Thing {
 
     @Id
     private String id;
 
+    @TextIndexed
     private String name;
 
     public String getId() {

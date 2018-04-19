@@ -1,8 +1,5 @@
 package com.example.demo;
 
-import static org.springframework.data.mongodb.core.query.Criteria.where;
-
-import org.springframework.data.annotation.TypeAlias;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -17,11 +14,8 @@ public class InheritanceAwarePartTreeMongoQuery extends PartTreeMongoQuery {
     public InheritanceAwarePartTreeMongoQuery(MongoQueryMethod method, MongoOperations mongoOperations) {
         super(method, mongoOperations);
 
-        inheritanceCriteria =
-                method.getEntityInformation().getJavaType().isAnnotationPresent(TypeAlias.class)
-                        ? where("_class")
-                        .is(method.getEntityInformation().getJavaType().getAnnotation(TypeAlias.class).value())
-                        : null;
+		inheritanceCriteria = MongoClassInheritanceScanner.getInstance().createInheritanceCritera(
+			method.getEntityInformation().getJavaType());
     }
 
     @Override

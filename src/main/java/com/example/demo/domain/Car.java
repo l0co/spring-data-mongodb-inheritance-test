@@ -1,12 +1,14 @@
 package com.example.demo.domain;
 
 import org.springframework.data.annotation.TypeAlias;
+import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "things")
 @TypeAlias("car")
 public class Car extends Thing {
 
+    @TextIndexed
     private String model;
 
     public String getModel() {

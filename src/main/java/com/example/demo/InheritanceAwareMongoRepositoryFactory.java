@@ -1,13 +1,13 @@
 package com.example.demo;
 
-import java.lang.reflect.Method;
-import java.util.Optional;
+import org.springframework.data.annotation.TypeAlias;
 import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.query.MongoQueryMethod;
-import org.springframework.data.mongodb.repository.query.PartTreeMongoQuery;
+import org.springframework.data.mongodb.repository.query.MongoQueryMethodExtractor;
 import org.springframework.data.mongodb.repository.query.StringBasedMongoQuery;
 import org.springframework.data.mongodb.repository.support.MongoRepositoryFactory;
 import org.springframework.data.projection.ProjectionFactory;
@@ -19,6 +19,9 @@ import org.springframework.data.repository.query.QueryLookupStrategy.Key;
 import org.springframework.data.repository.query.RepositoryQuery;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.lang.Nullable;
+
+import java.lang.reflect.Method;
+import java.util.Optional;
 
 public class InheritanceAwareMongoRepositoryFactory extends MongoRepositoryFactory {
 
@@ -73,13 +76,29 @@ public class InheritanceAwareMongoRepositoryFactory extends MongoRepositoryFacto
 
             if (namedQueries.hasQuery(namedQueryName)) {
                 String namedQuery = namedQueries.getQuery(namedQueryName);
-                return new StringBasedMongoQuery(namedQuery, queryMethod, operations, EXPRESSION_PARSER,
-                        evaluationContextProvider);
+				return new StringBasedMongoQuery(
+					enhanceQuery(namedQuery, queryMethod),
+					queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider);
             } else if (queryMethod.hasAnnotatedQuery()) {
-                return new StringBasedMongoQuery(queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider);
+				return new StringBasedMongoQuery(
+					enhanceQuery(MongoQueryMethodExtractor.extractAnnotatatedQuery(queryMethod), queryMethod),
+					queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider);
             } else {
                 return new InheritanceAwarePartTreeMongoQuery(queryMethod, operations);
             }
         }
     }
+
+	/**
+	 * Injects {@link TypeAlias} into mongo @{@link Query}'s {@code #{#entityName}} expression.
+	 */
+	private static String enhanceQuery(String query, MongoQueryMethod method) {
+		String typeAlias = MongoClassInheritanceScanner.getInstance().findAlias(method.getEntityInformation().getJavaType());
+
+		if (typeAlias!=null)
+			return query.replaceAll("\\#\\{\\#entityName\\}", "'" + typeAlias + "'");
+
+		return query;
+	}
+
 }

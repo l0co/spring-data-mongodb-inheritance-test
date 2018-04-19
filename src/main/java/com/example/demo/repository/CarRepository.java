@@ -1,10 +1,10 @@
 package com.example.demo.repository;
 
 import com.example.demo.domain.Car;
-import java.util.List;
-import org.springframework.data.repository.CrudRepository;
 
-public interface CarRepository extends CrudRepository<Car, String> {
+import java.util.List;
+
+public interface CarRepository extends ThingRepository<Car> {
 
     List<Car> findCarsByIdNotNull();
 
