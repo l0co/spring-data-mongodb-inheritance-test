@@ -1,6 +1,6 @@
 # What is this?
 
-This is an extension for @beb4ch idea for Mongo Inheritance. The original README content is below, my one is yet more below.  
+This is an extension of [this idea](https://medium.com/@mladen.maravic/spring-data-mongodb-my-take-on-inheritance-support-102361c08e3d) for Mongo inheritance in Spring Data. The original README content is below, my one is yet more below.
 
 This repo is a very simple example of how inheritance support could be added to Spring Data for MongoDB.
 
