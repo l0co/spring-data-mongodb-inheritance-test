@@ -1,5 +1,7 @@
 package com.example.demo;
 
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.data.annotation.TypeAlias;
 import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.mongodb.core.MongoOperations;
@@ -7,7 +9,6 @@ import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.query.MongoQueryMethod;
-import org.springframework.data.mongodb.repository.query.MongoQueryMethodExtractor;
 import org.springframework.data.mongodb.repository.query.StringBasedMongoQuery;
 import org.springframework.data.mongodb.repository.support.MongoRepositoryFactory;
 import org.springframework.data.projection.ProjectionFactory;
@@ -19,6 +20,7 @@ import org.springframework.data.repository.query.QueryLookupStrategy.Key;
 import org.springframework.data.repository.query.RepositoryQuery;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.lang.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
@@ -81,7 +83,7 @@ public class InheritanceAwareMongoRepositoryFactory extends MongoRepositoryFacto
 					queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider);
             } else if (queryMethod.hasAnnotatedQuery()) {
 				return new StringBasedMongoQuery(
-					enhanceQuery(MongoQueryMethodExtractor.extractAnnotatatedQuery(queryMethod), queryMethod),
+					enhanceQuery(extractAnnotatedQuery(method), queryMethod),
 					queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider);
             } else {
                 return new InheritanceAwarePartTreeMongoQuery(queryMethod, operations);
@@ -99,6 +101,14 @@ public class InheritanceAwareMongoRepositoryFactory extends MongoRepositoryFacto
 			return query.replaceAll("\\#\\{\\#entityName\\}", "'" + typeAlias + "'");
 
 		return query;
+	}
+
+	protected static String extractAnnotatedQuery(Method method) {
+		return Optional.ofNullable(AnnotatedElementUtils.findMergedAnnotation(method, Query.class))
+			.map(AnnotationUtils::getValue)
+			.map(it -> (String) it)
+			.filter(StringUtils::hasText)
+			.orElse(null);
 	}
 
 }
