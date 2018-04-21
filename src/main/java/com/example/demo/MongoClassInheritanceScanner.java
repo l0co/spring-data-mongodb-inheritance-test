@@ -14,14 +14,15 @@ import java.util.stream.Collectors;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 
 /**
- * Calculates subclasses for any mongo entity class.
+ * Calculates subclasses for any mongo entity class. We use string class names instead of classes here, due to different classloader
+ * problem with spring boot libraries.
  *
  * @author Lukasz Frankowski (http://lifeinide.com)
  */
 public class MongoClassInheritanceScanner {
 
-	protected List<Class> classes = Collections.synchronizedList(new ArrayList<>());
-	protected Map<Class, List<Class>> allClasses = new ConcurrentHashMap<>();
+	protected List<String> classes = Collections.synchronizedList(new ArrayList<>());
+	protected Map<String, List<Class>> allClasses = new ConcurrentHashMap<>();
 	protected Map<Class, List<String>> aliases = new ConcurrentHashMap<>();
 
 	private static MongoClassInheritanceScanner instance;
@@ -30,11 +31,7 @@ public class MongoClassInheritanceScanner {
 		ClassPathScanningCandidateComponentProvider provider = new ClassPathScanningCandidateComponentProvider(false);
 		provider.addIncludeFilter(new AnnotationTypeFilter(TypeAlias.class));
 		provider.findCandidateComponents("com.example").forEach(it -> {
-			try {
-				classes.add(Class.forName(it.getBeanClassName()));
-			} catch (ClassNotFoundException e) {
-				throw new RuntimeException(e);
-			}
+			classes.add(it.getBeanClassName());
 		});
 	}
 
@@ -49,9 +46,22 @@ public class MongoClassInheritanceScanner {
 	 * All classes of clazz, together with subclasses.
 	 */
 	@SuppressWarnings("unchecked")
-	public List<Class> getAllClasses(Class clazz) {
-		return allClasses.computeIfAbsent(clazz, clazz1 -> classes.stream()
-			.filter(clazz1::isAssignableFrom)
+	public List<Class> getAllClasses(String className) {
+		return allClasses.computeIfAbsent(className, clazz1 -> classes.stream()
+			.map(it -> {
+				try {
+					return Class.forName(it);
+				} catch (ClassNotFoundException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.filter(it -> {
+				try {
+					return Class.forName(className).isAssignableFrom(it);
+				} catch (ClassNotFoundException e) {
+					throw new RuntimeException(e);
+				}
+			})
 			.collect(Collectors.toList()));
 	}
 
@@ -60,7 +70,7 @@ public class MongoClassInheritanceScanner {
 	 */
 	@SuppressWarnings("unchecked")
 	public List<String> getAliases(Class clazz) {
-		return aliases.computeIfAbsent(clazz, clazz1 -> getAllClasses(clazz1).stream()
+		return aliases.computeIfAbsent(clazz, clazz1 -> getAllClasses(clazz1.getName()).stream()
 			.map(this::findAlias)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList()));

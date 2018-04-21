@@ -15,6 +15,7 @@
  */
 package org.springframework.data.mongodb.core.index;
 
+import com.example.demo.MongoClassInheritanceScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -24,10 +25,7 @@ import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexRes
 import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver.TextIndexIncludeOptions.IncludeStrategy;
 import org.springframework.data.mongodb.core.index.TextIndexDefinition.TextIndexDefinitionBuilder;
 import org.springframework.data.mongodb.core.index.TextIndexDefinition.TextIndexedFieldSpec;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
-import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
-import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
+import org.springframework.data.mongodb.core.mapping.*;
 import org.springframework.data.util.TypeInformation;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -201,25 +199,48 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 	private Collection<? extends IndexDefinitionHolder> potentiallyCreateTextIndexDefinition(
 		MongoPersistentEntity<?> root) {
 
-		// two hacks here
 		// only one text index will created per collection
 		if (alreadyCreatedTextIndexes.contains(root.getCollection()))
 			return Collections.emptyList();
 		alreadyCreatedTextIndexes.add(root.getCollection());
 
-		// do not create index with class name but with collection name instead
-		String name = root.getCollection() + "_TextIndex";
-		TextIndexDefinitionBuilder indexDefinitionBuilder = new TextIndexDefinitionBuilder().named(name);
+		TextIndexDefinitionBuilder indexDefinitionBuilder = new TextIndexDefinitionBuilder().named(root.getCollection() + "_TextIndex");
 
 		if (StringUtils.hasText(root.getLanguage())) {
 			indexDefinitionBuilder.withDefaultLanguage(root.getLanguage());
 		}
 
-		try {
-			appendTextIndexInformation("", Path.empty(), indexDefinitionBuilder, root,
-				new TextIndexIncludeOptions(IncludeStrategy.DEFAULT), new CycleGuard());
-		} catch (CyclicPropertyReferenceException e) {
-			LOGGER.info(e.getMessage());
+		// so, because we return only one index per collection, we now need to find derived entity classes and include them here
+		// but first we may not exists in the root entity so we need to find it
+		Class rootCollectionClass = root.getType();
+		String collection = root.getCollection();
+		while (rootCollectionClass.getSuperclass().isAnnotationPresent(Document.class)) {
+			Document documentAnnot = (Document) rootCollectionClass.getSuperclass().getAnnotation(Document.class);
+			if (!collection.equals(documentAnnot.collection()))
+				break;
+			rootCollectionClass = rootCollectionClass.getSuperclass();
+		}
+
+		boolean allowOverride = true;
+		for (Class<?> clazz: MongoClassInheritanceScanner.getInstance().getAllClasses(rootCollectionClass.getName())) {
+
+			BasicMongoPersistentEntity mongoPersistentEntity = null;
+			try {
+				// use class for name for this classloader
+				mongoPersistentEntity = mappingContext.getRequiredPersistentEntity(Class.forName(clazz.getName()));
+			} catch (ClassNotFoundException e) {
+				throw new RuntimeException(e);
+			}
+
+			try {
+				appendTextIndexInformation("", Path.empty(), indexDefinitionBuilder, mongoPersistentEntity,
+					new TextIndexIncludeOptions(IncludeStrategy.DEFAULT), new CycleGuard(), allowOverride);
+			} catch (CyclicPropertyReferenceException e) {
+				LOGGER.info(e.getMessage());
+			}
+
+			allowOverride = false; // allow override text index parameters only for first iteration
+
 		}
 
 		TextIndexDefinition indexDefinition = indexDefinitionBuilder.build();
@@ -229,13 +250,14 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 		}
 
 		IndexDefinitionHolder holder = new IndexDefinitionHolder("", indexDefinition, root.getCollection());
+
 		return Collections.singletonList(holder);
 
 	}
 
 	private void appendTextIndexInformation(final String dotPath, final Path path,
 											final TextIndexDefinitionBuilder indexDefinitionBuilder, final MongoPersistentEntity<?> entity,
-											final TextIndexIncludeOptions includeOptions, final CycleGuard guard) {
+											final TextIndexIncludeOptions includeOptions, final CycleGuard guard, boolean allowOverride) {
 
 		entity.doWithProperties(new PropertyHandler<MongoPersistentProperty>() {
 
@@ -244,7 +266,7 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 				guard.protect(persistentProperty, path);
 
-				if (persistentProperty.isExplicitLanguageProperty() && !StringUtils.hasText(dotPath)) {
+				if (persistentProperty.isExplicitLanguageProperty() && !StringUtils.hasText(dotPath) && allowOverride) {
 					indexDefinitionBuilder.withLanguageOverride(persistentProperty.getFieldName());
 				}
 
@@ -271,7 +293,7 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 						try {
 							appendTextIndexInformation(propertyDotPath, propertyPath, indexDefinitionBuilder,
-								mappingContext.getPersistentEntity(persistentProperty.getActualType()), optionsForNestedType, guard);
+								mappingContext.getPersistentEntity(persistentProperty.getActualType()), optionsForNestedType, guard, true);
 						} catch (CyclicPropertyReferenceException e) {
 							LOGGER.info(e.getMessage());
 						} catch (InvalidDataAccessApiUsageException e) {
