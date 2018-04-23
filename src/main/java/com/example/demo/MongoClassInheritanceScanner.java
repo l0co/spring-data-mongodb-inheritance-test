@@ -22,7 +22,7 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 public class MongoClassInheritanceScanner {
 
 	protected List<String> classes = Collections.synchronizedList(new ArrayList<>());
-	protected Map<String, List<Class>> allClasses = new ConcurrentHashMap<>();
+	protected Map<String, List<String>> allClasses = new ConcurrentHashMap<>();
 	protected Map<Class, List<String>> aliases = new ConcurrentHashMap<>();
 
 	private static MongoClassInheritanceScanner instance;
@@ -46,8 +46,10 @@ public class MongoClassInheritanceScanner {
 	 * All classes of clazz, together with subclasses.
 	 */
 	@SuppressWarnings("unchecked")
-	public List<Class> getAllClasses(String className) {
-		return allClasses.computeIfAbsent(className, clazz1 -> classes.stream()
+	public List<Class> getAllClasses(String className, ClassLoader classLoader) {
+		if (!allClasses.containsKey(className)) {
+
+			allClasses.computeIfAbsent(className, clazz1 -> classes.stream()
 			.map(it -> {
 				try {
 					return Class.forName(it);
@@ -62,7 +64,20 @@ public class MongoClassInheritanceScanner {
 					throw new RuntimeException(e);
 				}
 			})
+				.map(Class::getName)
 			.collect(Collectors.toList()));
+
+		}
+
+		return allClasses.get(className).stream()
+			.map(it -> {
+				try {
+					return classLoader.loadClass(it);
+				} catch (ClassNotFoundException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.collect(Collectors.toList());
 	}
 
 	/**
@@ -70,7 +85,7 @@ public class MongoClassInheritanceScanner {
 	 */
 	@SuppressWarnings("unchecked")
 	public List<String> getAliases(Class clazz) {
-		return aliases.computeIfAbsent(clazz, clazz1 -> getAllClasses(clazz1.getName()).stream()
+		return aliases.computeIfAbsent(clazz, clazz1 -> getAllClasses(clazz1.getName(), clazz1.getClassLoader()).stream()
 			.map(this::findAlias)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList()));

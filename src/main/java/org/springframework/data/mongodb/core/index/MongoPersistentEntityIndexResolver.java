@@ -222,12 +222,14 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 		}
 
 		boolean allowOverride = true;
-		for (Class<?> clazz: MongoClassInheritanceScanner.getInstance().getAllClasses(rootCollectionClass.getName())) {
+		for (Class<?> clazz: MongoClassInheritanceScanner.getInstance()
+				.getAllClasses(rootCollectionClass.getName(), rootCollectionClass.getClassLoader())) {
 
 			BasicMongoPersistentEntity mongoPersistentEntity = null;
 			try {
 				// use class for name for this classloader
-				mongoPersistentEntity = mappingContext.getRequiredPersistentEntity(Class.forName(clazz.getName()));
+				mongoPersistentEntity = mappingContext.getRequiredPersistentEntity(
+					rootCollectionClass.getClassLoader().loadClass(clazz.getName()));
 			} catch (ClassNotFoundException e) {
 				throw new RuntimeException(e);
 			}
