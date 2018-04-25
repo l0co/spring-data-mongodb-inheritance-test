@@ -200,9 +200,14 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 		MongoPersistentEntity<?> root) {
 
 		// only one text index will created per collection
-		if (alreadyCreatedTextIndexes.contains(root.getCollection()))
+		if (alreadyCreatedTextIndexes.contains(root.getCollection())) {
+			LOGGER.debug("Already created text index definition for: {} from: {}, skipping", root.getType().getSimpleName(),
+				root.getCollection());
 			return Collections.emptyList();
+		}
 		alreadyCreatedTextIndexes.add(root.getCollection());
+		LOGGER.debug("Starting to create text index for: {} from collection: {}",
+			root.getType().getSimpleName(), root.getCollection());
 
 		TextIndexDefinitionBuilder indexDefinitionBuilder = new TextIndexDefinitionBuilder().named(root.getCollection() + "_TextIndex");
 
@@ -222,6 +227,10 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 		}
 
 		boolean allowOverride = true;
+		List<Class> allClasses = MongoClassInheritanceScanner.getInstance()
+			.getAllClasses(rootCollectionClass.getName(), rootCollectionClass.getClassLoader());
+		LOGGER.debug("To create text index for: {} from collection: {} will scan following classes: {}",
+			root.getType().getSimpleName(), root.getCollection(), allClasses.stream().map(Class::getSimpleName).toArray());
 		for (Class<?> clazz: MongoClassInheritanceScanner.getInstance()
 				.getAllClasses(rootCollectionClass.getName(), rootCollectionClass.getClassLoader())) {
 
@@ -246,10 +255,17 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 		}
 
 		TextIndexDefinition indexDefinition = indexDefinitionBuilder.build();
+		LOGGER.debug("Creating text index for: {} from collection: {} with keys: {}",
+			root.getType().getSimpleName(), root.getCollection(), indexDefinition.getIndexKeys().toJson());
 
 		if (!indexDefinition.hasFieldSpec()) {
+			LOGGER.debug("Skipping text index creation because no text fields found for: {} from collection: {}",
+				root.getType().getSimpleName(), root.getCollection());
 			return Collections.emptyList();
 		}
+
+		LOGGER.debug("Returning text index definition with: {} fields for: {} from collection: {}", indexDefinition.getIndexKeys().size(),
+			root.getType().getSimpleName(), root.getCollection());
 
 		IndexDefinitionHolder holder = new IndexDefinitionHolder("", indexDefinition, root.getCollection());
 

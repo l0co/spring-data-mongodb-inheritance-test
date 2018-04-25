@@ -23,8 +23,8 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * {@link IndexDefinition} to span multiple keys for text search.
@@ -42,7 +42,12 @@ public class TextIndexDefinition implements IndexDefinition {
 	private @Nullable IndexFilter filter;
 
 	TextIndexDefinition() {
-		fieldSpecs = new LinkedHashSet<TextIndexedFieldSpec>();
+		// the order of fields in build index dependens on from which entity we started to scan
+		// (what's root.getType() of MongoPersistentEntityIndexResolver.potentiallyCreateTextIndexDefinition)
+		// this is random in this implementation and causes further mongo problems with
+		// Index with name: LunaTextIndex already exists with different options
+		// so we sort it manually here
+		fieldSpecs = new TreeSet<>((o1, o2) -> o1.getFieldname().compareTo(o2.getFieldname()));
 	}
 
 	/**
