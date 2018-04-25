@@ -245,7 +245,7 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 			try {
 				appendTextIndexInformation("", Path.empty(), indexDefinitionBuilder, mongoPersistentEntity,
-					new TextIndexIncludeOptions(IncludeStrategy.DEFAULT), new CycleGuard(), allowOverride);
+					new TextIndexIncludeOptions(IncludeStrategy.DEFAULT), new CycleGuard());
 			} catch (CyclicPropertyReferenceException e) {
 				LOGGER.info(e.getMessage());
 			}
@@ -275,7 +275,7 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 	private void appendTextIndexInformation(final String dotPath, final Path path,
 											final TextIndexDefinitionBuilder indexDefinitionBuilder, final MongoPersistentEntity<?> entity,
-											final TextIndexIncludeOptions includeOptions, final CycleGuard guard, boolean allowOverride) {
+											final TextIndexIncludeOptions includeOptions, final CycleGuard guard) {
 
 		entity.doWithProperties(new PropertyHandler<MongoPersistentProperty>() {
 
@@ -284,8 +284,11 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 				guard.protect(persistentProperty, path);
 
-				if (persistentProperty.isExplicitLanguageProperty() && !StringUtils.hasText(dotPath) && allowOverride) {
+				try {
+					if (persistentProperty.isExplicitLanguageProperty() && !StringUtils.hasText(dotPath))
 					indexDefinitionBuilder.withLanguageOverride(persistentProperty.getFieldName());
+				} catch (InvalidDataAccessApiUsageException e) {
+					// language override already set, skip
 				}
 
 				TextIndexed indexed = persistentProperty.findAnnotation(TextIndexed.class);
@@ -311,7 +314,7 @@ public class MongoPersistentEntityIndexResolver implements IndexResolver {
 
 						try {
 							appendTextIndexInformation(propertyDotPath, propertyPath, indexDefinitionBuilder,
-								mappingContext.getPersistentEntity(persistentProperty.getActualType()), optionsForNestedType, guard, true);
+								mappingContext.getPersistentEntity(persistentProperty.getActualType()), optionsForNestedType, guard);
 						} catch (CyclicPropertyReferenceException e) {
 							LOGGER.info(e.getMessage());
 						} catch (InvalidDataAccessApiUsageException e) {
